@@ -27,13 +27,12 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.firstinspires.ftc.teamcode;
+package teamcode;
 
-import com.qualcomm.robotcore.eventloop.opmode.Disabled;
-import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
+import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
-import com.qualcomm.robotcore.eventloop.opmode.OpMode;
+import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
 
@@ -64,7 +63,7 @@ import com.qualcomm.robotcore.util.ElapsedTime;
  */
 
 @TeleOp(name="Basic: Omni Linear OpMode", group="Iterative Opmode")
-public class BasicOmniOpMode_Linear extends OpMode {
+public class BasicOmni extends OpMode {
 
     // Declare OpMode members for each of the 4 motors.
     private ElapsedTime runtime = new ElapsedTime();
@@ -72,6 +71,8 @@ public class BasicOmniOpMode_Linear extends OpMode {
     private DcMotor leftBackDrive = null;
     private DcMotor rightFrontDrive = null;
     private DcMotor rightBackDrive = null;
+    private DcMotor intakeMotor = null;
+    private Servo intakeServo = null;
 
 
     double leftFrontPower = 0;
@@ -88,6 +89,8 @@ public class BasicOmniOpMode_Linear extends OpMode {
         leftBackDrive = hardwareMap.get(DcMotor.class, "left_drive_back");
         rightFrontDrive = hardwareMap.get(DcMotor.class, "right_drive_front");
         rightBackDrive = hardwareMap.get(DcMotor.class, "right_drive_back");
+        intakeMotor = hardwareMap.get(DcMotor.class, "intake_motor");
+        intakeServo = hardwareMap.get(Servo.class, "intake_servo");
 
         // Most robots need the motors on one side to be reversed to drive forward.
         // When you first test your robot, push the left joystick forward
@@ -140,6 +143,13 @@ public class BasicOmniOpMode_Linear extends OpMode {
         leftBackDrive.setPower(leftBackPower);
         rightBackDrive.setPower(rightBackPower);
 
+        intakeMotor.setPower(gamepad1.right_trigger - gamepad1.left_trigger);
+        if(gamepad1.a){
+            intakeServo.setPosition(180);
+        }else{
+            intakeServo.setPosition(0);
+        }
+
         // Show the elapsed game time and wheel power.
 
         telemetry.update();
@@ -151,33 +161,33 @@ public class BasicOmniOpMode_Linear extends OpMode {
 
 
 
-        void calculatePower(){
-            double max;
+    void calculatePower(){
+        double max;
 
-            // POV Mode uses left joystick to go forward & strafe, and right joystick to rotate.
-            double axial = -gamepad1.left_stick_y;  // Note: pushing stick forward gives negative value
-            double lateral = -gamepad1.left_stick_x;
-            double yaw = gamepad1.right_stick_x;
+        // POV Mode uses left joystick to go forward & strafe, and right joystick to rotate.
+        double axial = -gamepad1.left_stick_y;  // Note: pushing stick forward gives negative value
+        double lateral = -gamepad1.left_stick_x;
+        double yaw = gamepad1.right_stick_x;
 
-            // Combine the joystick requests for each axis-motion to determine each wheel's power.
-            // Set up a variable for each drive wheel to save the power level for telemetry.
-            leftFrontPower = axial + lateral + yaw;
-            rightFrontPower = axial - lateral - yaw;
-            leftBackPower = axial - lateral + yaw;
-            rightBackPower = axial + lateral - yaw;
+        // Combine the joystick requests for each axis-motion to determine each wheel's power.
+        // Set up a variable for each drive wheel to save the power level for telemetry.
+        leftFrontPower = axial + lateral + yaw;
+        rightFrontPower = axial - lateral - yaw;
+        leftBackPower = axial - lateral + yaw;
+        rightBackPower = axial + lateral - yaw;
 
-            // Normalize the values so no wheel power exceeds 100%
-            // This ensures that the robot maintains the desired motion.
-            max = Math.max(Math.abs(leftFrontPower), Math.abs(rightFrontPower));
-            max = Math.max(max, Math.abs(leftBackPower));
-            max = Math.max(max, Math.abs(rightBackPower));
+        // Normalize the values so no wheel power exceeds 100%
+        // This ensures that the robot maintains the desired motion.
+        max = Math.max(Math.abs(leftFrontPower), Math.abs(rightFrontPower));
+        max = Math.max(max, Math.abs(leftBackPower));
+        max = Math.max(max, Math.abs(rightBackPower));
 
-            if (max > 1.0) {
-                leftFrontPower /= max;
-                rightFrontPower /= max;
-                leftBackPower /= max;
-                rightBackPower /= max;
-            }
+        if (max > 1.0) {
+            leftFrontPower /= max;
+            rightFrontPower /= max;
+            leftBackPower /= max;
+            rightBackPower /= max;
         }
     }
+}
 
