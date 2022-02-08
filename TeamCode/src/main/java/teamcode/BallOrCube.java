@@ -24,7 +24,6 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 public class BallOrCube extends LinearOpMode {
     OpenCvCamera webcam;
     SamplePipeline pipeline;
-    HubPipeline blackPipeline;
     private ElapsedTime runtime = new ElapsedTime();
 
     private DcMotor leftFrontDrive = null;
@@ -39,6 +38,8 @@ public class BallOrCube extends LinearOpMode {
     double leftBackPower = 0;
     double rightBackPower = 0;
 
+    int stageNum = 0;
+
     @Override
     public void runOpMode() {
 
@@ -46,7 +47,6 @@ public class BallOrCube extends LinearOpMode {
         webcam = OpenCvCameraFactory.getInstance().createWebcam(hardwareMap.get(WebcamName.class, "Webcam 1"), cameraMonitorViewId);
 
         pipeline = new SamplePipeline();
-        blackPipeline = new HubPipeline();
 
         webcam.setPipeline(pipeline);
 
@@ -83,8 +83,10 @@ public class BallOrCube extends LinearOpMode {
 
         waitForStart();
 
+        //raise intake
+
         intakeMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        /*
+
         intakeMotor.setPower(0.2);
 
         while(opModeIsActive() && intakeMotor.getCurrentPosition() < 1000){
@@ -93,91 +95,43 @@ public class BallOrCube extends LinearOpMode {
         }
 
         intakeMotor.setPower(0);
-        */
 
+        OBJECTS currentObject = null;
+
+        //move until it sees a duck or the red square on the ground
         moveForward();
 
-        while (opModeIsActive() && pipeline.getType() != SamplePipeline.TYPE.CUBE) {
-            telemetry.addData("Type", pipeline.getType());
-            telemetry.addData("Average", pipeline.getAverage());
-            telemetry.addData("Status", "Searching for cube");
-            telemetry.update();
-            sleep(50);
+        while(currentObject != OBJECTS.DUCK){
+            while (opModeIsActive() && pipeline.getType() != SamplePipeline.TYPE.CUBE && !pipeline.getIsRed()) {
+                telemetry.addData("Type", pipeline.getType());
+                telemetry.addData("Average", pipeline.getAverage());
+                telemetry.addData("Status", "Searching for cube");
+                telemetry.update();
+                sleep(50);
+            }
+
+            stopMoving();
+            currentObject = checkObject();
+
+            if(currentObject == OBJECTS.DUCK){
+                grabObject();
+            }else{
+                stageNum++;
+                moveRight();
+            }
         }
+        moveRight();
 
-        stopMoving();
+        //go right until it sees the center of the carousel
+        pipeline.setTopLeft(300,0);
+        pipeline.setBottomRight(340,360);
 
-        /*
-        intakeMotor.setPower(-0.2);
-
-        while(opModeIsActive() && intakeMotor.getCurrentPosition() > 0){
-            telemetry.addData("Status", "Lowering lift");
-            telemetry.update();
-        }
-
-
-        intakeMotor.setPower(0);
-        */
-
-        intakeServo.setPosition(180);
-
-        while(opModeIsActive() && intakeServo.getPosition() < 1){
-            telemetry.addData("Status", "grabbing");
-            telemetry.addData("Servo Status", intakeServo.getPosition());
-            telemetry.update();
-        }
-
-
-        /*intakeMotor.setPower(0.2);
-
-        while(opModeIsActive() && intakeMotor.getCurrentPosition() < 1000){
-            telemetry.addData("Status", "Raising lift");
-            telemetry.update();
-        }
-
-        */
-
-        webcam.setPipeline(blackPipeline);
-
-        leftFrontDrive.setPower(0.2);
-        leftBackDrive.setPower(-0.2);
-        rightFrontDrive.setPower(-0.2);
-        rightBackDrive.setPower(0.2);
-
-        while(opModeIsActive() && !blackPipeline.getIsBlack()){
+        while(opModeIsActive() && !pipeline.getIsRed()){
             telemetry.addData("Status", "looking for alliance hub");
             telemetry.update();
         }
 
         stopMoving();
-
-
-
-        /*
-        while (opModeIsActive() && pipeline.getType() != SamplePipeline.TYPE.CUBE) {
-            telemetry.addData("Type", pipeline.getType());
-            telemetry.addData("Average", pipeline.getAverage());
-            telemetry.update();
-            sleep(50);
-
-
-        }
-
-        leftFrontDrive.setPower(0);
-        leftBackDrive.setPower(0);
-        rightFrontDrive.setPower(0);
-        rightBackDrive.setPower(0);
-
-        webcam.setPipeline(blackPipeline);
-
-        while (opModeIsActive()) {
-            telemetry.addData("is black", blackPipeline.getIsBlack());
-            telemetry.addData("Average", blackPipeline.getAverage());
-            telemetry.update();
-            sleep(50);
-
-
-        }*/
 
 
     }
@@ -190,16 +144,26 @@ public class BallOrCube extends LinearOpMode {
         Point topLeft = new Point(300, 240);
         Point bottomRight = new Point(340, 360);
 
+        private static boolean isRed = false;
+
         Mat region1_Cb;
         Mat YCrCb = new Mat();
         Mat Cb = new Mat();
 
-        private volatile int average;
+        Mat region1_Cr;
+        Mat YCrCb2 = new Mat();
+        Mat Cr = new Mat();
+
+        private volatile int Cb_average;
+        private volatile int Cr_average;
         private volatile TYPE type = TYPE.BALL;
 
         private void inputToCb(Mat input) {
             Imgproc.cvtColor(input, YCrCb, Imgproc.COLOR_RGB2YCrCb);
             Core.extractChannel(YCrCb, Cb, 2);
+
+            Imgproc.cvtColor(input, YCrCb2, Imgproc.COLOR_RGB2YCrCb);
+            Core.extractChannel(YCrCb2, Cr, 1);
         }
 
         @Override
@@ -207,20 +171,28 @@ public class BallOrCube extends LinearOpMode {
             inputToCb(input);
 
             region1_Cb = Cb.submat(new Rect(topLeft, bottomRight));
+            region1_Cr = Cr.submat(new Rect(topLeft, bottomRight));
         }
 
         @Override
         public Mat processFrame(Mat input) {
             inputToCb(input);
 
-            average = (int) Core.mean(region1_Cb).val[0];
+            Cb_average = (int) Core.mean(region1_Cb).val[0];
+            Cr_average = (int) Core.mean(region1_Cr).val[0];
 
             Imgproc.rectangle(input, topLeft, bottomRight, BLUE, 2);
 
-            if (average > THRESHOLD) {
+            if (Cb_average > THRESHOLD) {
                 type = TYPE.BALL;
             } else {
                 type = TYPE.CUBE;
+            }
+
+            if (Cr_average > THRESHOLD) {
+                isRed = true;
+            } else {
+                isRed = false;
             }
 
             return input;
@@ -231,7 +203,19 @@ public class BallOrCube extends LinearOpMode {
         }
 
         public int getAverage() {
-            return average;
+            return Cb_average;
+        }
+
+        public boolean getIsRed(){
+            return isRed;
+        }
+
+        public void setTopLeft(int x, int y){
+            topLeft = new Point(x, y);
+        }
+
+        public void setBottomRight(int x, int y){
+            bottomRight = new Point(x, y);
         }
 
         public enum TYPE {
@@ -239,59 +223,7 @@ public class BallOrCube extends LinearOpMode {
         }
     }
 
-    public static class HubPipeline extends OpenCvPipeline {
-        private static final Scalar BLUE = new Scalar(0, 0, 255);
 
-        private static final int THRESHOLD = 25;
-
-        Point topLeft = new Point(300, 0);
-        Point bottomRight = new Point(340, 360);
-
-        Mat region1_Y;
-        Mat YCrCb = new Mat();
-        Mat Y = new Mat();
-
-        private volatile int average;
-        private static boolean isBlack;
-
-        private void inputToCb(Mat input) {
-            Imgproc.cvtColor(input, YCrCb, Imgproc.COLOR_RGB2YCrCb);
-            Core.extractChannel(YCrCb, Y, 0);
-        }
-
-        @Override
-        public void init(Mat input) {
-            inputToCb(input);
-
-            region1_Y = Y.submat(new Rect(topLeft, bottomRight));
-        }
-
-        @Override
-        public Mat processFrame(Mat input) {
-            inputToCb(input);
-
-            average = (int) Core.mean(region1_Y).val[0];
-
-            Imgproc.rectangle(input, topLeft, bottomRight, BLUE, 2);
-
-            if (average < THRESHOLD) {
-                isBlack = true;
-            } else {
-                isBlack = false;
-            }
-
-            return input;
-        }
-
-        public boolean getIsBlack() {
-            return isBlack;
-        }
-
-        public int getAverage() {
-            return average;
-        }
-
-    }
 
     private void moveForward(){
         leftFrontDrive.setPower(0.2);
@@ -300,10 +232,74 @@ public class BallOrCube extends LinearOpMode {
         rightBackDrive.setPower(0.2);
     }
 
+    private void moveLeft(){
+        leftFrontDrive.setPower(0.2);
+        leftBackDrive.setPower(-0.2);
+        rightFrontDrive.setPower(-0.2);
+        rightBackDrive.setPower(0.2);
+    }
+
+    private void moveRight(){
+        leftFrontDrive.setPower(-0.2);
+        leftBackDrive.setPower(0.2);
+        rightFrontDrive.setPower(0.2);
+        rightBackDrive.setPower(-0.2);
+    }
+
     private void stopMoving(){
         leftFrontDrive.setPower(0);
         leftBackDrive.setPower(0);
         rightFrontDrive.setPower(0);
         rightBackDrive.setPower(0);
+    }
+
+    private void grabObject(){
+        //lower intake on top of the duck
+
+        intakeMotor.setPower(-0.2);
+
+        while(opModeIsActive() && intakeMotor.getCurrentPosition() > 0){
+            telemetry.addData("Status", "Lowering lift");
+            telemetry.update();
+        }
+
+
+        intakeMotor.setPower(0);
+
+        //grab
+        intakeServo.setPosition(180);
+
+        while(opModeIsActive() && intakeServo.getPosition() < 1){
+            telemetry.addData("Status", "grabbing");
+            telemetry.addData("Servo Status", intakeServo.getPosition());
+            telemetry.update();
+        }
+
+        //raise intake back up
+        intakeMotor.setPower(0.2);
+
+        while(opModeIsActive() && intakeMotor.getCurrentPosition() < 1000){
+            telemetry.addData("Status", "Raising lift");
+            telemetry.update();
+        }
+
+        intakeMotor.setPower(0);
+    }
+
+    private OBJECTS checkObject(){
+        if(pipeline.getType() == SamplePipeline.TYPE.CUBE) {
+            return OBJECTS.DUCK;
+        }else if(pipeline.getIsRed()){
+            return OBJECTS.SQUARE;
+        }
+
+        return null;
+
+
+    }
+
+    private enum OBJECTS{
+        DUCK,
+        SQUARE
     }
 }
