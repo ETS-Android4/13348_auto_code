@@ -45,7 +45,6 @@ public class BallOrCube extends LinearOpMode {
 
         int cameraMonitorViewId = hardwareMap.appContext.getResources().getIdentifier("cameraMonitorViewId", "id", hardwareMap.appContext.getPackageName());
         webcam = OpenCvCameraFactory.getInstance().createWebcam(hardwareMap.get(WebcamName.class, "Webcam 1"), cameraMonitorViewId);
-
         pipeline = new SamplePipeline();
 
         webcam.setPipeline(pipeline);
@@ -83,6 +82,9 @@ public class BallOrCube extends LinearOpMode {
 
         waitForStart();
 
+        pipeline.setTopLeft(300,120);
+        pipeline.setBottomRight(340,180);
+
         //raise intake
 
         intakeMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
@@ -96,6 +98,24 @@ public class BallOrCube extends LinearOpMode {
 
         intakeMotor.setPower(0);
 
+        while(opModeIsActive() && pipeline.getType() != SamplePipeline.TYPE.BALL){
+            telemetry.addData("Status", "testing box size");
+            telemetry.update();
+        }
+
+        pipeline.setTopLeft(300,0);
+        pipeline.setBottomRight(340,360);
+
+        while(opModeIsActive()){
+            telemetry.addData("status", "testing second size");
+        }
+
+
+
+
+
+
+        /*
         OBJECTS currentObject = null;
 
         //move until it sees a duck or the red square on the ground
@@ -132,6 +152,8 @@ public class BallOrCube extends LinearOpMode {
         }
 
         stopMoving();
+
+        */
 
 
     }
