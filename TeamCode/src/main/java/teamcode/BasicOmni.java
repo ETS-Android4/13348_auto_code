@@ -31,6 +31,7 @@ package teamcode;
 
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
+import com.qualcomm.robotcore.hardware.CRServo;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.util.ElapsedTime;
@@ -71,14 +72,18 @@ public class BasicOmni extends OpMode {
     private DcMotor leftBackDrive = null;
     private DcMotor rightFrontDrive = null;
     private DcMotor rightBackDrive = null;
+    private DcMotor linearSlideMotor = null;
+    private Servo beltServo = null;
     private DcMotor intakeMotor = null;
-    private Servo intakeServo = null;
+    private CRServo intakeServo = null;
 
 
     double leftFrontPower = 0;
     double rightFrontPower = 0;
     double leftBackPower = 0;
     double rightBackPower = 0;
+
+    double servoPos = 0;
 
     @Override
     public void init() {
@@ -89,8 +94,10 @@ public class BasicOmni extends OpMode {
         leftBackDrive = hardwareMap.get(DcMotor.class, "left_drive_back");
         rightFrontDrive = hardwareMap.get(DcMotor.class, "right_drive_front");
         rightBackDrive = hardwareMap.get(DcMotor.class, "right_drive_back");
+        linearSlideMotor = hardwareMap.get(DcMotor.class, "linear_slide");
+        intakeServo = hardwareMap.get(CRServo.class, "intake_servo");
+        beltServo = hardwareMap.get(Servo.class, "belt_servo");
         intakeMotor = hardwareMap.get(DcMotor.class, "intake_motor");
-        intakeServo = hardwareMap.get(Servo.class, "intake_servo");
 
         // Most robots need the motors on one side to be reversed to drive forward.
         // When you first test your robot, push the left joystick forward
@@ -144,11 +151,20 @@ public class BasicOmni extends OpMode {
         rightBackDrive.setPower(rightBackPower);
 
         intakeMotor.setPower(gamepad1.right_trigger - gamepad1.left_trigger);
-        if(gamepad1.a){
-            intakeServo.setPosition(180);
+        if(gamepad1.left_bumper){
+            intakeServo.setPower(-1);
+        }else if(gamepad1.right_bumper){
+            intakeServo.setPower(1);
         }else{
-            intakeServo.setPosition(0);
+            intakeServo.setPower(0);
         }
+
+        if(gamepad1.a){
+            beltServo.setPosition(180);
+        }else{
+            beltServo.setPosition(0);
+        }
+
 
         // Show the elapsed game time and wheel power.
 
